@@ -23,6 +23,7 @@
   "devDependencies": {
     "@types/jest": "^29.5.1",
     "@types/node": "^20.1.7",
+    "@types/socket.io": "^3.0.2",
     "cross-env": "5.2.0",
     "nodemon": "^2.0.22",
     "ts-node": "^10.9.1",
@@ -45,6 +46,7 @@
     "lodash": "^4.17.21",
     "mongoose": "5.13.13",
     "morgan-body": "2.4.14",
+    "socket.io": "^4.7.2",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^4.6.3",
     "tslint": "^6.1.3",

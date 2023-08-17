@@ -1,5 +1,6 @@
 import * as bcrypt from 'bcrypt';
 import * as jwt from 'jsonwebtoken';
+import socketIo from 'socket.io';
 import admin  from 'firebase-admin';
 import { config } from '../config/config.core';
 import Logger from '../libs/logger';
@@ -8,9 +9,10 @@ import { BCRYPT_SALT_ROUNDS, SERVICE_NAME } from '../libs/constants';
 import { DuplicateKeyError, UnAuthorizedError, BadRequestError } from '../entities/errors';
 
 
+
 const logger = new Logger();
 
-const serviceAccount = require('../../test-chat-c76f6-firebase-adminsdk-ca12l-1bb354af2f.json'); 
+const serviceAccount = require('../../test-chat-c76f6-firebase-adminsdk-ca12l-1bb354af2f.json');
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
   databaseURL: 'https://test-chat-c76f6-default-rtdb.firebaseio.com'
@@ -22,8 +24,10 @@ const db = admin.database();
 export default class UserService {
 
     private _userRepository: UserRepository;
-    constructor() {
-        this._userRepository = new UserRepository();
+    private _socketIo: socketIo.Server;
+    constructor(socketIoInstance: socketIo.Server) {
+      this._userRepository = new UserRepository();
+      this._socketIo = socketIoInstance;
     }
 
     public async createUser(data) {
@@ -85,12 +89,12 @@ export default class UserService {
                 },
               ]);
         }
-        const userdata = { 
+        const userdata = {
           ...{name} && name ? {name} : {},
           ...email && email ? {email} : {},
           ...password && password ? { password: await bcrypt.hash(password, BCRYPT_SALT_ROUNDS) } : {},
           ...userType && userType ? {userType} : {},
-          originalId: id 
+          originalId: id
         };
           const startTime = Date.now();
           const user = await this._userRepository.update(userdata);
@@ -159,7 +163,7 @@ export default class UserService {
               { $match: { originalId: id, deletedAt: null } },
               { $sort: { createdAt: -1 } },
               { $project: { _id: 0, name: 1, email: 1, originalId: 1, createdAt: 1} }
-            ]
+            ];
             const user = await this._userRepository.getAllAggregation(pipline);
             const endTime = Date.now();
             const timeElapsed = `${endTime - startTime} ms`;
@@ -220,10 +224,10 @@ export default class UserService {
               })}`);
             const startTime = Date.now();
             const pipeline = [
-                { $match: { email: email } },
+                { $match: { email } },
                 { $sort: { createdAt: -1 } },
                 { $limit: 1 }
-            ]
+            ];
             const checkUserExist = await this._userRepository.getAllAggregation(pipeline);
             const endTime = Date.now();
             const timeElapsed = `${endTime - startTime} ms`;
@@ -234,9 +238,9 @@ export default class UserService {
                 if (validPassword) {
                     token = token = jwt.sign({email: checkUserExist[0].email, userType: checkUserExist[0].userType, originalId: checkUserExist[0].originalId}, config.secret, { expiresIn: '1d' });
                     const hash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
-                    const {name, userType, originalId} = checkUserExist[0]
+                    const {name, userType, originalId} = checkUserExist[0];
                     const userdata = { name, email, password: hash, userType, originalId };
-                    if(checkUserExist[0].deletedAt) {
+                    if (checkUserExist[0].deletedAt) {
                       const startTime1 = Date.now();
                       await this._userRepository.update(userdata);
                       const endTime1 = Date.now();
@@ -256,7 +260,7 @@ export default class UserService {
         }
     }
 
-    public async storeChat(senderId, receiverId, message, user) {
+    public async storeChat(senderId, receiverId, message, user, senderUserType, receiverUserType) {
       try {
         logger.info(`${ JSON.stringify({
           api: 'api/send', custom: {
@@ -269,11 +273,11 @@ export default class UserService {
           originalId: {
             $in: [senderId, receiverId]
           }
-        }, {originalId: 1, userType: 1, _id:0});
+        }, {originalId: 1, userType: 1, _id: 0});
         function findMatchingOriginalId(dataToMatch, dataArray) {
           for (const item of dataArray) {
-            if(dataArray.length !==2) {
-              return false
+            if (dataArray.length !== 2) {
+              return false;
             }
             if (item.originalId === dataToMatch.originalId) {
               return true;
@@ -282,22 +286,8 @@ export default class UserService {
           return false;
         }
 
-        function validateUserTypesNotSame(dataArray) {
-          const userTypeSet = new Set();
-          
-          for (const item of dataArray) {
-            if (userTypeSet.has(item.userType)) {
-              return false;
-            }
-            userTypeSet.add(item.userType);
-          }
-          
-          return true;
-        }
-
-        const isValid = validateUserTypesNotSame(checkUserExist);
         const isMatch = findMatchingOriginalId(user, checkUserExist);
-        if(senderId === receiverId) {
+        if (senderId === receiverId) {
           throw new BadRequestError([
             {
               location: 'body',
@@ -307,7 +297,7 @@ export default class UserService {
             },
           ]);
         }
-        if(!isMatch) {
+        if (!isMatch) {
           throw new BadRequestError([
             {
               location: 'body',
@@ -317,7 +307,7 @@ export default class UserService {
             },
           ]);
         }
-        if(!isValid) {
+        if (senderUserType !== receiverUserType) {
           throw new BadRequestError([
             {
               location: 'body',
@@ -332,6 +322,9 @@ export default class UserService {
           message,
           timestamp: admin.database.ServerValue.TIMESTAMP,
           sender: senderId,
+          receiver: receiverId,
+          // senderUserType,
+          // receiverUserType,
         });
         const receiverRef = db.ref(`chats/${receiverId}/${senderId}`).push();
         logger.info(`${ JSON.stringify({
@@ -346,18 +339,22 @@ export default class UserService {
           message,
           timestamp: admin.database.ServerValue.TIMESTAMP,
           sender: senderId,
+          receiver: receiverId,
+          // senderUserType,
+          // receiverUserType,
         });
         const endTime = Date.now();
         const timeElapsed = `${endTime - startTime} ms`;
         logger.debug(`${ JSON.stringify({ api: 'api/send', custom: { component: SERVICE_NAME, service: 'storeChat', timeElapsed }})}`);
+        this._socketIo.to(receiverId).emit('newMessage', { message, sender: senderId });
         return { success: true };
       } catch (error) {
         logger.error(`${ JSON.stringify({ api: 'api/send', custom: { component: SERVICE_NAME, service: 'storeChat', error }})}}`);
-        throw error
+        throw error;
       }
     }
-    
-    public async getChatMessages(userId, chatId, user) {
+
+    public async getChatMessages(userId, chatId, user, limit, page) {
       try {
           logger.info(`${ JSON.stringify({
               api: 'api/user/getMessage', custom: {
@@ -370,11 +367,11 @@ export default class UserService {
               originalId: {
                 $in: [userId, chatId]
               }
-            }, {originalId: 1, userType: 1, _id:0});
+            }, {originalId: 1, userType: 1, _id: 0});
             function findMatchingOriginalId(dataToMatch, dataArray) {
               for (const item of dataArray) {
-                if(dataArray.length !==2) {
-                  return false
+                if (dataArray.length !== 2) {
+                  return false;
                 }
                 if (item.originalId === dataToMatch.originalId) {
                   return true;
@@ -382,23 +379,23 @@ export default class UserService {
               }
               return false;
             }
-    
+
             function validateUserTypesNotSame(dataArray) {
               const userTypeSet = new Set();
-              
+
               for (const item of dataArray) {
                 if (userTypeSet.has(item.userType)) {
                   return false;
                 }
                 userTypeSet.add(item.userType);
               }
-              
+
               return true;
             }
-    
+
             const isValid = validateUserTypesNotSame(checkUserExist);
             const isMatch = findMatchingOriginalId(user, checkUserExist);
-            if(userId === chatId) {
+            if (userId === chatId) {
               throw new BadRequestError([
                 {
                   location: 'body',
@@ -408,7 +405,7 @@ export default class UserService {
                 },
               ]);
             }
-            if(!isMatch) {
+            if (!isMatch) {
               throw new BadRequestError([
                 {
                   location: 'body',
@@ -418,7 +415,7 @@ export default class UserService {
                 },
               ]);
             }
-            if(!isValid) {
+            if (!isValid) {
               throw new BadRequestError([
                 {
                   location: 'body',
@@ -428,20 +425,111 @@ export default class UserService {
                 },
               ]);
             }
-            const snapshot = await db.ref(`chats/${userId}/${chatId}`).once('value');
+            const startIndex = parseInt(limit) * (parseInt(page) - 1);
+            const snapshot = await db
+                                    .ref(`chats/${userId}/${chatId}`)
+                                    .orderByChild('timestamp')
+                                    .limitToLast(parseInt(limit) + startIndex)
+                                    .once('value');
             const messages = [];
             const startTime = Date.now();
-            snapshot.forEach((childSnapshot) => {
+            snapshot.forEach(childSnapshot => {
               messages.push(childSnapshot.val());
             });
             const endTime = Date.now();
             const timeElapsed = `${endTime - startTime} ms`;
             logger.debug(`${ JSON.stringify({ api: 'api/user/getMessage', custom: { component: SERVICE_NAME, service: 'getChatMessages', timeElapsed }})}`);
+            this._socketIo.to(userId).emit('newMessages', messages);
             return messages;
       } catch (error) {
           logger.error(`${ JSON.stringify({ api: 'api/user/getMessage', custom: { component: SERVICE_NAME, service: 'getChatMessages', error }})}}`);
           throw error;
       }
   }
+
+  public async deleteBuldMessage(userId, recipientId, user) {
+    try {
+        logger.info(`${ JSON.stringify({
+            api: 'api/message/:userId/:recipientId', custom: {
+              component: SERVICE_NAME,
+              service: 'deleteBuldMessage',
+              functionParms: { userId, recipientId },
+            },
+          })}`);
+          const checkUserExist = await this._userRepository.findData({
+            originalId: {
+              $in: [userId, recipientId]
+            }
+          }, {originalId: 1, userType: 1, _id: 0});
+          function findMatchingOriginalId(dataToMatch, dataArray) {
+            for (const item of dataArray) {
+              if (dataArray.length !== 2) {
+                return false;
+              }
+              if (item.originalId === dataToMatch.originalId) {
+                return true;
+              }
+            }
+            return false;
+          }
+
+          function validateUserTypesNotSame(dataArray) {
+            const userTypeSet = new Set();
+
+            for (const item of dataArray) {
+              if (userTypeSet.has(item.userType)) {
+                return false;
+              }
+              userTypeSet.add(item.userType);
+            }
+
+            return true;
+          }
+
+          const isValid = validateUserTypesNotSame(checkUserExist);
+          const isMatch = findMatchingOriginalId(user, checkUserExist);
+          if (userId === recipientId) {
+            throw new BadRequestError([
+              {
+                location: 'body',
+                msg: `You can't send message to your own`,
+                param: '',
+                value: ``,
+              },
+            ]);
+          }
+          if (!isMatch) {
+            throw new BadRequestError([
+              {
+                location: 'body',
+                msg: `Invalid Id`,
+                param: '',
+                value: ``,
+              },
+            ]);
+          }
+          if (!isValid) {
+            throw new BadRequestError([
+              {
+                location: 'body',
+                msg: `You are not authorise to access`,
+                param: '',
+                value: ``,
+              },
+            ]);
+          }
+          
+          const startTime = Date.now();
+          await db.ref(`chats/${userId}/${recipientId}`).remove();
+          const endTime = Date.now();
+          const timeElapsed = `${endTime - startTime} ms`;
+          logger.debug(`${ JSON.stringify({ api: 'api/message/:userId/:recipientId', custom: { component: SERVICE_NAME, service: 'deleteBuldMessage', timeElapsed }})}`);
+          this._socketIo.to(recipientId).emit('chatHistoryDeleted', { userId });
+          return { success: true };
+    } catch (error) {
+        logger.error(`${ JSON.stringify({ api: 'api/message/:userId/:recipientId', custom: { component: SERVICE_NAME, service: 'deleteBuldMessage', error }})}}`);
+        throw error;
+    }
+}
 }
 

@@ -35,7 +35,7 @@ let runningServer: any;
     } else {
       server.bootstrap();
 
-      runningServer = server.application.listen(config.port);
+      runningServer = server.httpServer.listen(config.port);
 
 
       runningServer.on('listening', async () => {

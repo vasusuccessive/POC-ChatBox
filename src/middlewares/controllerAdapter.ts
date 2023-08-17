@@ -46,6 +46,7 @@ export default function controllerAdapter(controller: any = null, functionName: 
       }
     } catch (error) {
       logger.error(`${JSON.stringify({ api: 'controllerAdapter', custom: { component: SERVICE_NAME, controller: functionName, error } })}`);
+      console.log(error, 'error------');
       return next(error);
     }
   };

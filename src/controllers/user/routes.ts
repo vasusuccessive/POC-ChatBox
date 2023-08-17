@@ -3,7 +3,7 @@ import { validationHandler, controllerAdapter } from '../../middlewares';
 import userSchema from './validation';
 import UserRoutes from './controller';
 import authMiddleWare from '../../middlewares/authMiddleWare';
-import roleBasedAuthMiddleware from '../../middlewares/roleBasedAuthMiddleware'
+import roleBasedAuthMiddleware from '../../middlewares/roleBasedAuthMiddleware';
 
 const router = Router();
 
@@ -529,8 +529,11 @@ router.patch('/update/:id', authMiddleWare(), userSchema.update, validationHandl
 
 router.delete('/:id', authMiddleWare(), userSchema.delete, validationHandler, controllerAdapter(UserRoutes, 'deleteUser'));
 
-router.post('/send',  userSchema.send, validationHandler, authMiddleWare(), controllerAdapter(UserRoutes, 'sendMessage'))
+router.post('/send',  userSchema.send, validationHandler, authMiddleWare(), controllerAdapter(UserRoutes, 'sendMessage'));
 
-router.post('/message',  userSchema.message, validationHandler, authMiddleWare(), authMiddleWare(), controllerAdapter(UserRoutes, 'getMessage'))
+router.post('/message',  userSchema.message, validationHandler, authMiddleWare(), authMiddleWare(), controllerAdapter(UserRoutes, 'getMessage'));
+
+router.delete('/message/:userId/:recipientId',  userSchema.deleteMessage, validationHandler, authMiddleWare(), authMiddleWare(), controllerAdapter(UserRoutes, 'deleteAllMessage'));
+
 
 export default router;

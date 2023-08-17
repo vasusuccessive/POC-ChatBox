@@ -31,7 +31,7 @@ export default class Repository extends VersioningRepository<IResourceModel, mon
    * Get Users
    * @property {Object} query - getting record corresponding to email
    * @returns {User}
-  */
+   */
 
     public async findOneByQuery(query: any): Promise<Nullable<IResourceModel>> {
       return super.findOne(query);
@@ -50,7 +50,7 @@ export default class Repository extends VersioningRepository<IResourceModel, mon
   /**
    * Create new Users
    * @returns {Users}
-  */
+   */
   public async create(options: any): Promise<IResourceModel> {
     return super.create(options);
   }

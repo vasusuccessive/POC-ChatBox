@@ -91,7 +91,7 @@ export default {
     message: [
         body('userId')
         .exists().withMessage('userId is required.'),
-    
+
       body('chatId')
         .exists().withMessage('chatId is required.')
     ],
@@ -105,6 +105,26 @@ export default {
 
     body('message')
     .exists().withMessage('Message is required.')
-    .isLength({ min: 1 }).withMessage('Message should be at least 1 characters.')
-    ]
+    .isLength({ min: 1 }).withMessage('Message should be at least 1 characters.'),
+
+    // body('senderUserType')
+    // .exists().withMessage('senderUserType is required.')
+    // .custom(value => {
+    //   return ['FARMER', 'RETAILER'].includes(value.toUpperCase());
+    // }).withMessage('senderUserType userType'),
+
+    // body('receiverUserType')
+    // .exists().withMessage('receiverUserType is required.')
+    // .custom(value => {
+    //   return ['FARMER', 'RETAILER'].includes(value.toUpperCase());
+    // }).withMessage('Invalid receiverUserType'),
+
+    ],
+    deleteMessage: [
+        param('userId')
+        .exists().withMessage('userId is required.'),
+
+      param('recipientId')
+        .exists().withMessage('chatId is required.')
+    ],
 };

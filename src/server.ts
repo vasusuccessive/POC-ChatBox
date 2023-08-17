@@ -1,3 +1,5 @@
+import * as socketIo from 'socket.io';
+import * as http from 'http';
 import * as bodyParser from 'body-parser';
 import * as compress from 'compression';
 import * as timeout from 'connect-timeout';
@@ -5,7 +7,6 @@ import * as cors from 'cors';
 import * as express from 'express';
 import * as morganBody from 'morgan-body';
 import * as helmet from 'helmet';
-
 
 import Database from './libs/Database';
 import Swagger from './libs/Swagger';
@@ -19,8 +20,12 @@ const logger = new Logger();
 
 export default class Server {
   private app: express.Express;
+  public httpServer: http.Server;
+  private io: socketIo.Server;
   constructor(private config: any) {
     this.app = express();
+    this.httpServer = http.createServer(this.app);
+    this.io = new socketIo.Server(this.httpServer);
   }
 
   get application() {
@@ -33,6 +38,7 @@ export default class Server {
    */
   public bootstrap() {
     this.initJsonParser();
+    this.initWebSocket();
     this.initLogger();
     this.initHelmet();
     this.initCompress();
@@ -87,6 +93,28 @@ export default class Server {
 
     return this;
   }
+
+  /**
+   * Initialize WebSocket
+   */
+     private initWebSocket() {
+      try {
+        this.io.on('connection', (socket: socketIo.Socket) => {
+          console.log('A user connected');
+
+          socket.on('disconnect', () => {
+            console.log('User disconnected');
+          });
+        });
+
+        this.io.on('error', error => {
+          console.error('WebSocket error:', error);
+        });
+      } catch (error) {
+        console.error('Error initializing WebSocket:', error);
+      }
+    }
+
 
   /**
    *

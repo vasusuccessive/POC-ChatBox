@@ -21,7 +21,7 @@ export default () => async (req, res, next) => {
       if (token.startsWith('Bearer ')) {
           token = token.substring(7, token.length);
       }
-      
+
       const { secret } = config;
       let user;
       try {
@@ -37,7 +37,7 @@ export default () => async (req, res, next) => {
               },
           ]));
       }
-      
+
       if (!user) {
           return next(new ForbiddenError([
               {
@@ -59,7 +59,7 @@ export default () => async (req, res, next) => {
               },
           ]));
       }
-      
+
       req.user = user;
       next();
   } catch (error) {

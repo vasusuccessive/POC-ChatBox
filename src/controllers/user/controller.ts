@@ -1,14 +1,16 @@
+import { Server as SocketIOServer } from 'socket.io';
 import { SERVICE_NAME } from '../../libs/constants';
 import Logger from '../../libs/logger';
 import UserService from '../../service/userService';
 
 const logger = new Logger();
+const io = new SocketIOServer();
 
 class User {
 
     private userService: any;
     constructor() {
-        this.userService = new UserService();
+        this.userService = new UserService(io);
     }
 
     public async getUserById(
@@ -164,7 +166,7 @@ class User {
               },
             })}`);
             const startTime = Date.now();
-            const result = this.userService.login(email, password);
+            const result = await this.userService.login(email, password);
             const endTime = Date.now();
             const timeElapsed = `${endTime - startTime} ms`;
             logger.debug(`${ JSON.stringify({ api: 'api/users/login', custom: { component: SERVICE_NAME, controller: 'list', timeElapsed }})}`);
@@ -177,10 +179,12 @@ class User {
 
     public async getMessage({
       body: { userId, chatId },
+      query: { limit = '5', page = '1' },
       user
     }: {
       body: { userId: string, chatId: string, message: string };
-      user: any
+      user: any,
+      query: {limit: string, page: string}
     }) {
       try {
           logger.info(`${ JSON.stringify({
@@ -191,7 +195,7 @@ class User {
               },
             })}`);
             const startTime = Date.now();
-            const result = this.userService.getChatMessages(userId, chatId, user);
+            const result = this.userService.getChatMessages(userId, chatId, user, limit, page);
             const endTime = Date.now();
             const timeElapsed = `${endTime - startTime} ms`;
             logger.debug(`${ JSON.stringify({ api: 'api/getMessage', custom: { component: SERVICE_NAME, controller: 'getMessage', timeElapsed }})}`);
@@ -204,10 +208,10 @@ class User {
 
 
     public async sendMessage({
-      body: { senderId, receiverId, message },
+      body: { senderId, receiverId, message, senderUserType, receiverUserType },
       user
     }: {
-      body: { senderId: string, receiverId: string, message: string };
+      body: { senderId: string, receiverId: string, message: string, senderUserType: '', receiverUserType: '' };
       user: any
     }) {
       try {
@@ -219,13 +223,41 @@ class User {
               },
             })}`);
             const startTime = Date.now();
-            const result = this.userService.storeChat(senderId, receiverId, message, user);
+            const result = this.userService.storeChat(senderId, receiverId, message, user, senderUserType, receiverUserType);
             const endTime = Date.now();
             const timeElapsed = `${endTime - startTime} ms`;
             logger.debug(`${ JSON.stringify({ api: 'api/user/send', custom: { component: SERVICE_NAME, controller: 'sendMessage', timeElapsed }})}`);
             return result;
       } catch (error) {
           logger.error(`${ JSON.stringify({ api: 'api/user/send', custom: { component: SERVICE_NAME, controller: 'sendMessage', error }})}}`);
+          throw error;
+      }
+    }
+
+    public async deleteAllMessage({
+      params: { userId, recipientId },
+      user
+    }: {
+      params: { userId: string, recipientId: string, };
+      user: any,
+      query: {limit: string, page: string}
+    }) {
+      try {
+          logger.info(`${ JSON.stringify({
+              api: 'api/message/:userId/:recipientId', custom: {
+                component: SERVICE_NAME,
+                controller: 'deleteAllMessage',
+                reqBody: { userId, recipientId },
+              },
+            })}`);
+            const startTime = Date.now();
+            const result = this.userService.deleteBuldMessage(userId, recipientId, user);
+            const endTime = Date.now();
+            const timeElapsed = `${endTime - startTime} ms`;
+            logger.debug(`${ JSON.stringify({ api: 'api/message/:userId/:recipientId', custom: { component: SERVICE_NAME, controller: 'deleteAllMessage', timeElapsed }})}`);
+            return result;
+      } catch (error) {
+          logger.error(`${ JSON.stringify({ api: 'api/message:userId/:recipientId', custom: { component: SERVICE_NAME, controller: 'deleteAllMessage', error }})}}`);
           throw error;
       }
     }
