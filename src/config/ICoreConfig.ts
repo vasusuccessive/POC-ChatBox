@@ -12,4 +12,5 @@ export default interface ICoreConfig {
   secret: string;
   userDetails: IUserConfig;
   userTypeValues: string;
+  fireBaseDataBaseUrl: string
 }

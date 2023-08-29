@@ -22,4 +22,5 @@ export const config: ICoreConfig = {
     userType: process.env.USERTYPE,
   },
   userTypeValues: process.env.USERTYPEVALUES || 'SUPER_ADMIN, USER, PRODUCT_OWNER',
+  fireBaseDataBaseUrl: process.env.FIREBASE_REAL_TIME_DATA_BASE_URL || ''
 };

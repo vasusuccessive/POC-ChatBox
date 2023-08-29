@@ -15,7 +15,7 @@ const logger = new Logger();
 const serviceAccount = require('../../test-chat-c76f6-firebase-adminsdk-ca12l-1bb354af2f.json');
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: 'https://test-chat-c76f6-default-rtdb.firebaseio.com'
+  databaseURL: config.fireBaseDataBaseUrl
 });
 
 const db = admin.database();
